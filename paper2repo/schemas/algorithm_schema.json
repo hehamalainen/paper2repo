@@ -1,0 +1,95 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AlgorithmSchema",
+  "description": "Schema for extracted algorithms and equations",
+  "type": "object",
+  "required": ["algorithm_id", "name", "description"],
+  "properties": {
+    "algorithm_id": {
+      "type": "string",
+      "description": "Unique identifier for the algorithm"
+    },
+    "name": {
+      "type": "string",
+      "description": "Algorithm name"
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed description"
+    },
+    "pseudocode": {
+      "type": "string",
+      "description": "Pseudocode representation"
+    },
+    "equations": {
+      "type": "array",
+      "description": "Mathematical equations",
+      "items": {
+        "type": "object",
+        "properties": {
+          "equation_id": {
+            "type": "string"
+          },
+          "latex": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "variables": {
+            "type": "object",
+            "description": "Variable definitions"
+          }
+        }
+      }
+    },
+    "complexity": {
+      "type": "object",
+      "properties": {
+        "time": {
+          "type": "string"
+        },
+        "space": {
+          "type": "string"
+        }
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "implementation_notes": {
+      "type": "string"
+    }
+  }
+}

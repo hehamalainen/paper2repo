@@ -1,0 +1,76 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CodeMemEntry",
+  "description": "Schema for per-file code memory entries",
+  "type": "object",
+  "required": ["file", "core_purpose", "public_interface", "dependency_edges"],
+  "properties": {
+    "file": {
+      "type": "string",
+      "description": "File path relative to project root"
+    },
+    "core_purpose": {
+      "type": "string",
+      "description": "Brief description of file's purpose"
+    },
+    "public_interface": {
+      "type": "array",
+      "description": "Exported functions, classes, and APIs",
+      "items": {
+        "type": "object",
+        "required": ["name", "type"],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["function", "class", "constant", "interface", "type"]
+          },
+          "signature": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "dependency_edges": {
+      "type": "array",
+      "description": "Files this file depends on",
+      "items": {
+        "type": "object",
+        "required": ["target", "type"],
+        "properties": {
+          "target": {
+            "type": "string",
+            "description": "Target file path"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["import", "uses", "extends", "implements"]
+          },
+          "imports": {
+            "type": "array",
+            "description": "Specific symbols imported",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "implementation_notes": {
+      "type": "string",
+      "description": "Additional implementation details"
+    },
+    "tests": {
+      "type": "array",
+      "description": "Associated test files",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

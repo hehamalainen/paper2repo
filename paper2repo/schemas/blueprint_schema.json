@@ -1,0 +1,200 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BlueprintSchema",
+  "description": "Schema for code blueprint generation",
+  "type": "object",
+  "required": [
+    "project_file_hierarchy",
+    "component_specification",
+    "verification_protocol",
+    "execution_environment",
+    "staged_development_plan",
+    "build_order",
+    "entrypoints",
+    "traceability_matrix"
+  ],
+  "properties": {
+    "project_file_hierarchy": {
+      "type": "object",
+      "description": "Complete file and directory structure",
+      "properties": {
+        "root": {
+          "type": "string"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "purpose"],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "purpose": {
+                "type": "string"
+              },
+              "dependencies": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "component_specification": {
+      "type": "object",
+      "description": "Detailed component specifications",
+      "properties": {
+        "components": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "type", "purpose"],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["module", "class", "function", "interface"]
+              },
+              "purpose": {
+                "type": "string"
+              },
+              "public_interface": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "dependencies": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "verification_protocol": {
+      "type": "object",
+      "description": "Testing and verification strategy",
+      "properties": {
+        "test_strategy": {
+          "type": "string"
+        },
+        "test_files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "validation_criteria": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "execution_environment": {
+      "type": "object",
+      "description": "Runtime and dependencies",
+      "properties": {
+        "language": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "dependencies": {
+          "type": "object"
+        },
+        "build_system": {
+          "type": "string"
+        }
+      }
+    },
+    "staged_development_plan": {
+      "type": "object",
+      "description": "Phased development plan",
+      "properties": {
+        "phases": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["phase_id", "name", "tasks"],
+            "properties": {
+              "phase_id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "tasks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "build_order": {
+      "type": "array",
+      "description": "Order in which files should be built",
+      "items": {
+        "type": "string"
+      }
+    },
+    "entrypoints": {
+      "type": "array",
+      "description": "Main entry points for the application",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "traceability_matrix": {
+      "type": "object",
+      "description": "Mapping from paper concepts to code components",
+      "properties": {
+        "mappings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["concept_id", "component", "rationale"],
+            "properties": {
+              "concept_id": {
+                "type": "string"
+              },
+              "component": {
+                "type": "string"
+              },
+              "rationale": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
