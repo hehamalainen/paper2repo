@@ -52,8 +52,8 @@ def validate_api_key(api_key: str) -> tuple[bool, Optional[str]]:
     
     try:
         client = OpenAI(api_key=api_key)
-        # Simple validation call - list models
-        client.models.list()
+        # Use a lighter endpoint for validation - just retrieve a known model
+        client.models.retrieve('gpt-3.5-turbo')
         return True, None
     except openai.AuthenticationError:
         return False, "Invalid API key"
@@ -102,7 +102,7 @@ def extract_text_from_pdf(pdf_file) -> tuple[Optional[str], Optional[str]]:
 
 
 def generate_code_mock(api_key: str, paper_text: str, instructions: str, 
-                       model: str, progress_callback=None) -> Dict[str, Any]:
+                       model: str, progress_callback: Optional[callable] = None) -> Dict[str, Any]:
     """Mock code generation for MVP.
     
     Args:
@@ -152,10 +152,14 @@ python main.py
 ```
 """,
         "main.py": """\"\"\"Main implementation generated from paper.\"\"\"
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def main():
     \"\"\"Main function.\"\"\"
-    print("Hello from generated code!")
+    logger.info("Starting generated code execution")
     # TODO: Implement paper algorithms here
     
 if __name__ == "__main__":
@@ -277,11 +281,15 @@ def main():
         
         # Validate API key when provided
         if api_key:
-            if st.session_state.get('last_api_key') != api_key:
+            # Store only a hash of the key to check if it changed, not the key itself
+            import hashlib
+            api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+            
+            if st.session_state.get('last_api_key_hash') != api_key_hash:
                 with st.spinner("Validating API key..."):
                     is_valid, error_msg = validate_api_key(api_key)
                     st.session_state.api_key_validated = is_valid
-                    st.session_state.last_api_key = api_key
+                    st.session_state.last_api_key_hash = api_key_hash
                     if not is_valid:
                         st.session_state.api_key_error = error_msg
             
