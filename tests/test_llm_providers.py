@@ -90,6 +90,10 @@ class TestOpenAIProvider:
             # If SDK is not available, OPENAI_AVAILABLE should be False
             if not OPENAI_AVAILABLE:
                 pytest.skip("OpenAI SDK not installed - this is expected")
+            else:
+                # SDK is available, verify we can import the provider
+                from paper2repo.utils.llm_providers.openai_provider import OpenAIProvider
+                assert OpenAIProvider is not None
         except ImportError:
             pytest.skip("OpenAI SDK not installed - this is expected")
 
@@ -104,6 +108,10 @@ class TestAnthropicProvider:
             # If SDK is not available, ANTHROPIC_AVAILABLE should be False
             if not ANTHROPIC_AVAILABLE:
                 pytest.skip("Anthropic SDK not installed - this is expected")
+            else:
+                # SDK is available, verify we can import the provider
+                from paper2repo.utils.llm_providers.anthropic_provider import AnthropicProvider
+                assert AnthropicProvider is not None
         except ImportError:
             pytest.skip("Anthropic SDK not installed - this is expected")
 

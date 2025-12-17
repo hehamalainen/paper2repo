@@ -298,7 +298,8 @@ class LLMClient:
             logger.error(f"LLM generation failed for {agent_name}: {e}")
             # Refund the estimated tokens since the request failed
             self.token_budget.used_tokens -= estimated_tokens
-            self.token_budget.agent_usage[agent_name] -= estimated_tokens
+            if agent_name in self.token_budget.agent_usage:
+                self.token_budget.agent_usage[agent_name] -= estimated_tokens
             raise
     
     def get_budget_report(self) -> Dict[str, Any]:
