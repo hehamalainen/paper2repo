@@ -1,0 +1,2 @@
+[console_scripts]
+paper2repo = paper2repo.cli.main:cli
