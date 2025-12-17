@@ -1,0 +1,39 @@
+# Paper2Repo Configuration
+
+# LLM Provider Settings
+llm:
+  provider: ${LLM_PROVIDER:-mock}  # openai, anthropic, local, mock
+  fast_model: gpt-3.5-turbo
+  balanced_model: gpt-4
+  powerful_model: gpt-4-turbo
+  max_tokens: 4096
+  temperature: 0.7
+
+# Token Budget
+budget:
+  total_tokens: 1000000
+  per_agent_limit: 100000
+
+# Workflow Settings
+workflow:
+  max_refinement_iterations: 3
+  enable_reference_mining: true
+  clean_slate_memory: true
+
+# Output Settings
+output:
+  default_directory: ./output
+  create_readme: true
+  create_tests: true
+
+# Tool Settings
+tools:
+  github_token: ${GITHUB_TOKEN:-}
+  enable_sandbox: true
+  sandbox_timeout: 300
+
+# Validation
+validation:
+  min_compatibility_score: 0.80
+  enable_static_analysis: true
+  enable_execution_tests: false

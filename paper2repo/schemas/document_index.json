@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DocumentIndex",
+  "description": "Index structure for parsed research documents",
+  "type": "object",
+  "required": ["document_id", "title", "sections", "metadata"],
+  "properties": {
+    "document_id": {
+      "type": "string",
+      "description": "Unique identifier for the document"
+    },
+    "title": {
+      "type": "string",
+      "description": "Document title"
+    },
+    "sections": {
+      "type": "array",
+      "description": "Document sections with hierarchy",
+      "items": {
+        "type": "object",
+        "required": ["section_id", "heading", "content", "level"],
+        "properties": {
+          "section_id": {
+            "type": "string"
+          },
+          "heading": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "subsections": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "authors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "publication_date": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "doi": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

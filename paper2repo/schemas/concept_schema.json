@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ConceptSchema",
+  "description": "Schema for extracted concepts from research papers",
+  "type": "object",
+  "required": ["concept_id", "name", "description", "type"],
+  "properties": {
+    "concept_id": {
+      "type": "string",
+      "description": "Unique identifier for the concept"
+    },
+    "name": {
+      "type": "string",
+      "description": "Concept name"
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed description of the concept"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["data_structure", "algorithm", "model", "framework", "technique", "metric", "other"],
+      "description": "Type of concept"
+    },
+    "properties": {
+      "type": "object",
+      "description": "Key properties and attributes"
+    },
+    "relationships": {
+      "type": "array",
+      "description": "Relationships to other concepts",
+      "items": {
+        "type": "object",
+        "required": ["target_concept_id", "relationship_type"],
+        "properties": {
+          "target_concept_id": {
+            "type": "string"
+          },
+          "relationship_type": {
+            "type": "string",
+            "enum": ["depends_on", "extends", "uses", "related_to"]
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "source_sections": {
+      "type": "array",
+      "description": "Source document sections",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
