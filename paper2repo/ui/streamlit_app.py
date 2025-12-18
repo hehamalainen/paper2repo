@@ -16,6 +16,7 @@ if not STREAMLIT_AVAILABLE:
 
 from paper2repo import __version__
 from paper2repo.workflows.pipeline_orchestrator import PipelineOrchestrator
+from paper2repo.utils.llm_utils import LLMConfig, LLMProvider
 
 
 def main():
@@ -31,6 +32,20 @@ def main():
     
     # Sidebar configuration
     st.sidebar.header("Configuration")
+    
+    # OpenAI API Key input
+    api_key = st.sidebar.text_input(
+        "OpenAI API Key",
+        type="password",
+        help="Enter your OpenAI API key (BYOK - Bring Your Own Key)"
+    )
+    
+    # LLM Provider selection
+    use_openai = st.sidebar.checkbox(
+        "Use OpenAI API",
+        value=bool(api_key),
+        help="Enable real OpenAI API calls instead of mock responses"
+    )
     
     output_dir = st.sidebar.text_input(
         "Output Directory",
@@ -93,42 +108,92 @@ def main():
         if st.button("🚀 Generate Code", type="primary"):
             if not document_path and not document_text:
                 st.error("Please provide a paper (file or text)")
+            elif use_openai and not api_key:
+                st.error("Please provide an OpenAI API key or disable 'Use OpenAI API'")
             else:
-                with st.spinner("Generating code... This may take several minutes."):
-                    try:
-                        # Initialize pipeline
-                        pipeline = PipelineOrchestrator(
-                            output_dir=Path(output_dir),
-                            total_token_budget=token_budget
+                # Create progress indicators
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                try:
+                    # Create LLM Config
+                    if use_openai and api_key:
+                        llm_config = LLMConfig(
+                            provider=LLMProvider.OPENAI,
+                            api_key=api_key,
+                            fast_model="gpt-4o-mini",
+                            balanced_model="gpt-4o-mini",
+                            powerful_model="gpt-4o"
                         )
-                        
-                        # Prepare input
-                        input_data = {
-                            'user_input': user_input or "Generate code from paper"
-                        }
-                        
-                        if document_path:
-                            input_data['document_path'] = document_path
-                        if document_text:
-                            input_data['document_text'] = document_text
-                        
-                        # Run pipeline
-                        results = pipeline.run(input_data)
-                        
-                        # Store results in session state
-                        st.session_state['results'] = results
-                        st.session_state['output_dir'] = str(pipeline.get_output_directory())
-                        
-                        if results['success']:
-                            st.success("✅ Code generated successfully!")
-                            st.info(f"📁 Output: {pipeline.get_output_directory()}")
-                        else:
-                            st.error("❌ Generation failed")
-                            for error in results.get('errors', []):
-                                st.error(f"Error: {error}")
+                        status_text.text("🔧 Using OpenAI API...")
+                    else:
+                        llm_config = LLMConfig(provider=LLMProvider.MOCK)
+                        status_text.text("🔧 Using Mock mode...")
                     
-                    except Exception as e:
-                        st.error(f"Pipeline error: {e}")
+                    progress_bar.progress(10)
+                    
+                    # Initialize pipeline
+                    status_text.text("⚙️ Initializing pipeline...")
+                    pipeline = PipelineOrchestrator(
+                        output_dir=Path(output_dir),
+                        llm_config=llm_config,
+                        total_token_budget=token_budget
+                    )
+                    progress_bar.progress(20)
+                    
+                    # Prepare input
+                    input_data = {
+                        'user_input': user_input or "Generate code from paper"
+                    }
+                    
+                    if document_path:
+                        input_data['document_path'] = document_path
+                    if document_text:
+                        input_data['document_text'] = document_text
+                    
+                    # Phase 1: Blueprint
+                    status_text.text("📋 Phase 1: Blueprint Generation (Intent → Document → Concepts → Algorithms → Planning)...")
+                    progress_bar.progress(30)
+                    
+                    # Phase 2: Code Generation
+                    phase_container = st.container()
+                    with phase_container:
+                        st.info("🔄 Running pipeline phases...")
+                    
+                    # Run pipeline
+                    results = pipeline.run(input_data)
+                    
+                    progress_bar.progress(100)
+                    status_text.text("✅ Pipeline complete!")
+                    
+                    # Store results in session state
+                    st.session_state['results'] = results
+                    st.session_state['output_dir'] = str(pipeline.get_output_directory())
+                    
+                    if results['success']:
+                        st.success("✅ Code generated successfully!")
+                        st.info(f"📁 Output: {pipeline.get_output_directory()}")
+                        
+                        # Show token usage
+                        if 'token_budget' in results:
+                            budget = results['token_budget']
+                            st.metric(
+                                "Token Usage",
+                                f"{budget['used_tokens']:,}",
+                                f"{budget['utilization']:.1%} of budget"
+                            )
+                    else:
+                        st.error("❌ Generation failed")
+                        for error in results.get('errors', []):
+                            st.error(f"Error: {error}")
+                
+                except Exception as e:
+                    progress_bar.progress(0)
+                    status_text.text("")
+                    st.error(f"Pipeline error: {e}")
+                    import traceback
+                    with st.expander("Error Details"):
+                        st.code(traceback.format_exc())
     
     with tab2:
         st.header("Generation Results")
@@ -150,6 +215,32 @@ def main():
                     f"{budget['used_tokens']:,}",
                     f"{budget['utilization']:.1%} of budget"
                 )
+            
+            # Download button for generated code
+            if 'output_dir' in st.session_state:
+                output_path = Path(st.session_state['output_dir'])
+                if output_path.exists():
+                    st.subheader("📦 Download Generated Code")
+                    st.info(f"Output directory: {output_path}")
+                    
+                    # Create ZIP file
+                    import zipfile
+                    import io
+                    
+                    zip_buffer = io.BytesIO()
+                    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                        for file_path in output_path.rglob('*'):
+                            if file_path.is_file():
+                                arcname = file_path.relative_to(output_path)
+                                zip_file.write(file_path, arcname)
+                    
+                    zip_buffer.seek(0)
+                    st.download_button(
+                        label="📥 Download ZIP",
+                        data=zip_buffer,
+                        file_name="generated_code.zip",
+                        mime="application/zip"
+                    )
             
             # Show phases
             st.subheader("Pipeline Phases")

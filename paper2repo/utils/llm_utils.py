@@ -2,6 +2,9 @@
 from typing import Any, Dict, List, Optional, Callable
 from enum import Enum
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class LLMProvider(Enum):
@@ -25,11 +28,12 @@ class LLMConfig:
     def __init__(
         self,
         provider: LLMProvider = LLMProvider.MOCK,
-        fast_model: str = "gpt-3.5-turbo",
-        balanced_model: str = "gpt-4",
-        powerful_model: str = "gpt-4-turbo",
+        fast_model: str = "gpt-4o-mini",
+        balanced_model: str = "gpt-4o-mini",
+        powerful_model: str = "gpt-4o",
         max_tokens: int = 4096,
         temperature: float = 0.7,
+        api_key: Optional[str] = None,
     ):
         self.provider = provider
         self.fast_model = fast_model
@@ -37,6 +41,7 @@ class LLMConfig:
         self.powerful_model = powerful_model
         self.max_tokens = max_tokens
         self.temperature = temperature
+        self.api_key = api_key
 
 
 class TokenBudget:
@@ -114,6 +119,16 @@ class LLMClient:
         self.config = config
         self.token_budget = token_budget or TokenBudget()
         self.router = HybridRouter(config)
+        self._openai_client = None
+        
+        # Initialize OpenAI client if using OpenAI provider
+        if self.config.provider == LLMProvider.OPENAI and self.config.api_key:
+            try:
+                import openai
+                self._openai_client = openai.OpenAI(api_key=self.config.api_key)
+            except ImportError:
+                logger.warning("OpenAI library not installed. Install with: pip install openai")
+                self._openai_client = None
     
     def generate(
         self,
@@ -153,9 +168,70 @@ class LLMClient:
         if self.config.provider == LLMProvider.MOCK:
             return self._mock_generate(prompt, agent_name)
         
-        # TODO: Implement actual provider calls
-        # For now, return mock response
+        # Implement OpenAI provider
+        if self.config.provider == LLMProvider.OPENAI:
+            return self._openai_generate(
+                prompt=prompt,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                **kwargs
+            )
+        
+        # Fallback to mock if provider not implemented
+        logger.warning(f"Provider {self.config.provider} not implemented, using mock")
         return self._mock_generate(prompt, agent_name)
+    
+    def _openai_generate(
+        self,
+        prompt: str,
+        model: str,
+        max_tokens: int,
+        temperature: float,
+        **kwargs
+    ) -> str:
+        """Generate text using OpenAI API.
+        
+        Args:
+            prompt: Input prompt
+            model: Model name
+            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature
+            **kwargs: Additional OpenAI-specific arguments
+            
+        Returns:
+            Generated text
+        """
+        if not self._openai_client:
+            raise RuntimeError(
+                "OpenAI client not initialized. Ensure API key is provided and openai library is installed."
+            )
+        
+        try:
+            response = self._openai_client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": "You are a helpful AI assistant specialized in understanding and generating code from research papers."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=max_tokens,
+                temperature=temperature,
+                **kwargs
+            )
+            
+            # Extract the generated text
+            generated_text = response.choices[0].message.content
+            
+            # Log actual token usage
+            if hasattr(response, 'usage') and response.usage:
+                actual_tokens = response.usage.total_tokens
+                logger.info(f"OpenAI API call completed. Tokens used: {actual_tokens}")
+            
+            return generated_text
+            
+        except Exception as e:
+            logger.error(f"OpenAI API error: {e}")
+            raise RuntimeError(f"OpenAI API call failed: {e}")
     
     def _mock_generate(self, prompt: str, agent_name: str) -> str:
         """Generate mock response for testing."""
