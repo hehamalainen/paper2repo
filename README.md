@@ -1,7 +1,22 @@
+---
+title: Paper2Repo
+emoji: 📄
+colorFrom: blue
+colorTo: purple
+sdk: streamlit
+sdk_version: 1.28.0
+app_file: paper2repo/ui/streamlit_app.py
+pinned: false
+license: mit
+---
+
 # Paper2Repo 📄➡️💻
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/hehamalainen/paper2repo)
+
+🚀 **[Try the Live Demo →](https://huggingface.co/spaces/hehamalainen/paper2repo)**
 
 **Transform research papers into production-ready code repositories using AI-powered multi-agent orchestration.**
 
@@ -88,6 +103,23 @@ if results['success']:
     print(f"Code generated in: {pipeline.get_output_directory()}")
     print(f"Compatibility score: {results['artifacts']['validation']['compatibility_score']:.2f}")
 ```
+
+## ☁️ Deploy Your Own
+
+### Hugging Face Spaces (Recommended)
+
+The easiest way to deploy Paper2Repo is on Hugging Face Spaces:
+
+1. Go to [huggingface.co/new-space](https://huggingface.co/new-space)
+2. Choose "Streamlit" as SDK
+3. Clone this repo or link your GitHub repository
+4. Done! Your app will be live at `huggingface.co/spaces/YOUR_USERNAME/paper2repo`
+
+**Note**: You'll need to add your OpenAI API key as a secret in the Space settings for the app to function.
+
+### Local Deployment
+
+For local deployment, see the [Quick Start](#-quick-start) section above.
 
 ## 🏗️ Architecture
 
