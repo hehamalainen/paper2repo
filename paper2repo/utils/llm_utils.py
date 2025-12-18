@@ -63,7 +63,7 @@ def extract_json_from_response(response: str) -> Dict[str, Any]:
                 pass
     
     # If all else fails, raise an error
-    raise ValueError(f"Could not extract valid JSON from response")
+    raise ValueError("Could not extract valid JSON from response")
 
 
 class LLMProvider(Enum):
@@ -174,6 +174,12 @@ class HybridRouter:
 class LLMClient:
     """Unified LLM client with provider abstraction."""
     
+    # Default system message for OpenAI
+    DEFAULT_SYSTEM_MESSAGE = (
+        "You are a helpful AI assistant specialized in understanding and "
+        "generating code from research papers."
+    )
+    
     def __init__(self, config: LLMConfig, token_budget: Optional[TokenBudget] = None):
         self.config = config
         self.token_budget = token_budget or TokenBudget()
@@ -270,7 +276,7 @@ class LLMClient:
             response = self._openai_client.chat.completions.create(
                 model=model,
                 messages=[
-                    {"role": "system", "content": "You are a helpful AI assistant specialized in understanding and generating code from research papers."},
+                    {"role": "system", "content": self.DEFAULT_SYSTEM_MESSAGE},
                     {"role": "user", "content": prompt}
                 ],
                 max_tokens=max_tokens,

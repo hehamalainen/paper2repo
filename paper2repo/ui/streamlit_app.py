@@ -190,10 +190,12 @@ def main():
                 except Exception as e:
                     progress_bar.progress(0)
                     status_text.text("")
-                    st.error(f"Pipeline error: {e}")
-                    import traceback
-                    with st.expander("Error Details"):
-                        st.code(traceback.format_exc())
+                    st.error(f"Pipeline error: {str(e)}")
+                    # Only show detailed error in development
+                    if st.sidebar.checkbox("Show error details", value=False):
+                        import traceback
+                        with st.expander("Error Details"):
+                            st.code(traceback.format_exc())
     
     with tab2:
         st.header("Generation Results")
