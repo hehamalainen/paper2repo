@@ -18,7 +18,7 @@ def extract_json_from_response(response: str) -> Dict[str, Any]:
         Parsed JSON dictionary
         
     Raises:
-        json.JSONDecodeError: If JSON cannot be extracted
+        ValueError: If JSON cannot be extracted
     """
     # Try direct JSON parsing first
     try:
@@ -38,22 +38,32 @@ def extract_json_from_response(response: str) -> Dict[str, Any]:
             except json.JSONDecodeError:
                 continue
     
-    # Try to find JSON object or array in the response
-    # Look for {...} or [...]
-    json_obj_pattern = r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
-    json_arr_pattern = r'\[[^\[\]]*(?:\[[^\[\]]*\][^\[\]]*)*\]'
+    # Try to find JSON-like content between first { and last } or [ and ]
+    # This is a simple heuristic that works for most cases
+    stripped = response.strip()
     
-    for pattern in [json_obj_pattern, json_arr_pattern]:
-        matches = re.findall(pattern, response, re.DOTALL)
-        if matches:
-            for match in matches:
-                try:
-                    return json.loads(match)
-                except json.JSONDecodeError:
-                    continue
+    # Try to extract object
+    if '{' in stripped and '}' in stripped:
+        start = stripped.find('{')
+        end = stripped.rfind('}')
+        if start < end:
+            try:
+                return json.loads(stripped[start:end+1])
+            except json.JSONDecodeError:
+                pass
     
-    # If all else fails, raise the original error
-    raise json.JSONDecodeError(f"Could not extract valid JSON from response", response, 0)
+    # Try to extract array
+    if '[' in stripped and ']' in stripped:
+        start = stripped.find('[')
+        end = stripped.rfind(']')
+        if start < end:
+            try:
+                return json.loads(stripped[start:end+1])
+            except json.JSONDecodeError:
+                pass
+    
+    # If all else fails, raise an error
+    raise ValueError(f"Could not extract valid JSON from response")
 
 
 class LLMProvider(Enum):
@@ -269,6 +279,9 @@ class LLMClient:
             )
             
             # Extract the generated text
+            if not response.choices or not response.choices[0].message.content:
+                raise RuntimeError("OpenAI API returned empty response")
+            
             generated_text = response.choices[0].message.content
             
             # Log actual token usage
