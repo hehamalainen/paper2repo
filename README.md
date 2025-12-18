@@ -14,6 +14,7 @@ license: mit
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Hugging Face Spaces](https://img.shields.io/badge/🤗%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/AIHeikki/Papertorepo2)
 [![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/hehamalainen/paper2repo)
 
 🚀 **[Try the Live Demo →](https://huggingface.co/spaces/hehamalainen/paper2repo)**
@@ -21,6 +22,8 @@ license: mit
 **Transform research papers into production-ready code repositories using AI-powered multi-agent orchestration.**
 
 Paper2Repo is an intelligent system that reads research papers and automatically generates working code implementations, complete with documentation, tests, and proper structure.
+
+🌐 **[Try the Demo on Hugging Face](https://huggingface.co/spaces/AIHeikki/Papertorepo2)**
 
 ## ✨ Features
 
@@ -104,22 +107,14 @@ if results['success']:
     print(f"Compatibility score: {results['artifacts']['validation']['compatibility_score']:.2f}")
 ```
 
-## ☁️ Deploy Your Own
+## 🔄 Auto-Sync to Hugging Face
 
-### Hugging Face Spaces (Recommended)
+This repo automatically syncs to Hugging Face Spaces on every push.
 
-The easiest way to deploy Paper2Repo is on Hugging Face Spaces:
-
-1. Go to [huggingface.co/new-space](https://huggingface.co/new-space)
-2. Choose "Streamlit" as SDK
-3. Clone this repo or link your GitHub repository
-4. Done! Your app will be live at `huggingface.co/spaces/YOUR_USERNAME/paper2repo`
-
-**Note**: You'll need to add your OpenAI API key as a secret in the Space settings for the app to function.
-
-### Local Deployment
-
-For local deployment, see the [Quick Start](#-quick-start) section above.
+To set up for your own fork:
+1. Get your HF token from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+2. Add it as a GitHub secret named `HF_TOKEN`
+3. Update the Space ID in `.github/workflows/sync-to-huggingface.yml`
 
 ## 🏗️ Architecture
 
