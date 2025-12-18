@@ -1,3 +1,15 @@
+---
+title: Paper2Repo
+emoji: 📄
+colorFrom: blue
+colorTo: purple
+sdk: streamlit
+sdk_version: 1.28.0
+app_file: paper2repo/ui/streamlit_app.py
+pinned: false
+license: mit
+---
+
 # Paper2Repo 📄➡️💻
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
@@ -9,6 +21,8 @@
 🚀 **[Try the Live Demo →](https://paper2repo.streamlit.app)**
 
 Paper2Repo is an intelligent system that reads research papers and automatically generates working code implementations, complete with documentation, tests, and proper structure.
+
+🌐 **[Try the Demo on Hugging Face](https://huggingface.co/spaces/AIHeikki/Papertorepo2)**
 
 ## ✨ Features
 
@@ -121,6 +135,14 @@ Or manually:
 3. Connect your fork
 4. Set main file: `paper2repo/ui/streamlit_app.py`
 5. Deploy!
+## 🔄 Auto-Sync to Hugging Face
+
+This repo automatically syncs to Hugging Face Spaces on every push.
+
+To set up for your own fork:
+1. Get your HF token from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+2. Add it as a GitHub secret named `HF_TOKEN`
+3. Update the Space ID in `.github/workflows/sync-to-huggingface.yml`
 
 ## 🏗️ Architecture
 
