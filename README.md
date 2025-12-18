@@ -1,8 +1,23 @@
+---
+title: Paper2Repo
+emoji: 📄
+colorFrom: blue
+colorTo: purple
+sdk: streamlit
+sdk_version: 1.28.0
+app_file: paper2repo/ui/streamlit_app.py
+pinned: false
+license: mit
+---
+
 # Paper2Repo 📄➡️💻
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Hugging Face Spaces](https://img.shields.io/badge/🤗%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/AIHeikki/Papertorepo2)
+[![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/hehamalainen/paper2repo)
+
+🚀 **[Try the Live Demo →](https://huggingface.co/spaces/hehamalainen/paper2repo)**
 
 **Transform research papers into production-ready code repositories using AI-powered multi-agent orchestration.**
 
