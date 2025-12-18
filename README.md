@@ -2,10 +2,13 @@
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Hugging Face Spaces](https://img.shields.io/badge/🤗%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/AIHeikki/Papertorepo2)
 
 **Transform research papers into production-ready code repositories using AI-powered multi-agent orchestration.**
 
 Paper2Repo is an intelligent system that reads research papers and automatically generates working code implementations, complete with documentation, tests, and proper structure.
+
+🌐 **[Try the Demo on Hugging Face](https://huggingface.co/spaces/AIHeikki/Papertorepo2)**
 
 ## ✨ Features
 
@@ -88,6 +91,15 @@ if results['success']:
     print(f"Code generated in: {pipeline.get_output_directory()}")
     print(f"Compatibility score: {results['artifacts']['validation']['compatibility_score']:.2f}")
 ```
+
+## 🔄 Auto-Sync to Hugging Face
+
+This repo automatically syncs to Hugging Face Spaces on every push.
+
+To set up for your own fork:
+1. Get your HF token from [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+2. Add it as a GitHub secret named `HF_TOKEN`
+3. Update the Space ID in `.github/workflows/sync-to-huggingface.yml`
 
 ## 🏗️ Architecture
 
