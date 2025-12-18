@@ -22,7 +22,17 @@ For each concept, provide:
 - Properties/Attributes
 - Relationships to other concepts
 
-Format as JSON following the concept_schema.
+Return ONLY a JSON array of concepts. Do not include any other text or explanation.
+Example format:
+[
+  {{
+    "name": "...",
+    "description": "...",
+    "type": "...",
+    "properties": [...],
+    "relationships": [...]
+  }}
+]
 """
 
 

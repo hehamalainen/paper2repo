@@ -3,8 +3,57 @@ from typing import Any, Dict, List, Optional, Callable
 from enum import Enum
 import json
 import logging
+import re
 
 logger = logging.getLogger(__name__)
+
+
+def extract_json_from_response(response: str) -> Dict[str, Any]:
+    """Extract JSON from LLM response, handling markdown code blocks.
+    
+    Args:
+        response: Raw LLM response text
+        
+    Returns:
+        Parsed JSON dictionary
+        
+    Raises:
+        json.JSONDecodeError: If JSON cannot be extracted
+    """
+    # Try direct JSON parsing first
+    try:
+        return json.loads(response)
+    except json.JSONDecodeError:
+        pass
+    
+    # Try to extract JSON from markdown code blocks
+    # Look for ```json ... ``` or ``` ... ```
+    json_pattern = r'```(?:json)?\s*\n?(.*?)\n?```'
+    matches = re.findall(json_pattern, response, re.DOTALL)
+    
+    if matches:
+        for match in matches:
+            try:
+                return json.loads(match.strip())
+            except json.JSONDecodeError:
+                continue
+    
+    # Try to find JSON object or array in the response
+    # Look for {...} or [...]
+    json_obj_pattern = r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'
+    json_arr_pattern = r'\[[^\[\]]*(?:\[[^\[\]]*\][^\[\]]*)*\]'
+    
+    for pattern in [json_obj_pattern, json_arr_pattern]:
+        matches = re.findall(pattern, response, re.DOTALL)
+        if matches:
+            for match in matches:
+                try:
+                    return json.loads(match)
+                except json.JSONDecodeError:
+                    continue
+    
+    # If all else fails, raise the original error
+    raise json.JSONDecodeError(f"Could not extract valid JSON from response", response, 0)
 
 
 class LLMProvider(Enum):
