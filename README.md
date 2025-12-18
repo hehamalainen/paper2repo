@@ -14,12 +14,11 @@ license: mit
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Hugging Face Spaces](https://img.shields.io/badge/🤗%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/AIHeikki/Papertorepo2)
-[![Hugging Face Spaces](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/hehamalainen/paper2repo)
+[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://paper2repo.streamlit.app)
 
-🚀 **[Try the Live Demo →](https://huggingface.co/spaces/hehamalainen/paper2repo)**
+**Transform research papers into production-ready code repositories using AI.**
 
-**Transform research papers into production-ready code repositories using AI-powered multi-agent orchestration.**
+🚀 **[Try the Live Demo →](https://paper2repo.streamlit.app)**
 
 Paper2Repo is an intelligent system that reads research papers and automatically generates working code implementations, complete with documentation, tests, and proper structure.
 
@@ -36,9 +35,26 @@ Paper2Repo is an intelligent system that reads research papers and automatically
 - 💻 **Multiple Interfaces**: CLI and Web UI
 - 🧪 **Comprehensive Testing**: Full test suite included
 
+## 🎮 Try It Now
+
+**No installation required!** Try Paper2Repo instantly in your browser:
+
+1. 👉 Go to [paper2repo.streamlit.app](https://paper2repo.streamlit.app)
+2. 🔑 Enter your OpenAI API key ([Get one here](https://platform.openai.com/api-keys))
+3. 📄 Upload a research paper (PDF)
+4. ✨ Get working Python code!
+
+> **Note:** You need an OpenAI API key. Your key is never stored and only used during your session.
+
 ## 🚀 Quick Start
 
-### Installation
+### Try Online (No Installation)
+
+The easiest way to use Paper2Repo is through our hosted web interface at [paper2repo.streamlit.app](https://paper2repo.streamlit.app). Just bring your OpenAI API key!
+
+### Local Installation (For Developers)
+
+#### Installation
 
 ```bash
 # Clone the repository
@@ -55,7 +71,7 @@ pip install 'paper2repo[ui]'   # Web UI
 pip install 'paper2repo[pdf]'  # PDF support
 ```
 
-### Basic Usage
+#### Basic Usage
 
 #### Command Line
 
@@ -107,6 +123,18 @@ if results['success']:
     print(f"Compatibility score: {results['artifacts']['validation']['compatibility_score']:.2f}")
 ```
 
+## ☁️ Deploy Your Own
+
+Deploy your own instance to Streamlit Cloud:
+
+[![Deploy to Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://share.streamlit.io/deploy?repository=hehamalainen/paper2repo&branch=main&mainModule=paper2repo/ui/streamlit_app.py)
+
+Or manually:
+1. Fork this repository
+2. Go to [share.streamlit.io](https://share.streamlit.io)
+3. Connect your fork
+4. Set main file: `paper2repo/ui/streamlit_app.py`
+5. Deploy!
 ## 🔄 Auto-Sync to Hugging Face
 
 This repo automatically syncs to Hugging Face Spaces on every push.
@@ -206,7 +234,13 @@ python -m compileall paper2repo/
 
 ## 📋 Requirements
 
+### For Online Demo
+- **OpenAI API key** ([Get one here](https://platform.openai.com/api-keys))
+- No installation needed!
+
+### For Local Installation
 - **Python 3.11+** (required)
+- **OpenAI API key** for AI-powered code generation
 - **Core dependencies**: pyyaml, requests, pydantic, python-dotenv, jinja2, numpy
 - **Optional dependencies**:
   - CLI: click, rich
