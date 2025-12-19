@@ -144,3 +144,57 @@ def test_validator_agent():
     
     assert 'compatibility_score' in result
     assert 'passed' in result
+
+
+def test_pipeline_orchestrator_code_files_extraction():
+    """Test that pipeline orchestrator correctly extracts code_files from dict format."""
+    from paper2repo.workflows.pipeline_orchestrator import PipelineOrchestrator
+    from pathlib import Path
+    import tempfile
+    
+    # Create a temporary directory for output
+    with tempfile.TemporaryDirectory() as tmpdir:
+        orchestrator = PipelineOrchestrator(
+            output_dir=Path(tmpdir)
+        )
+        
+        # Simulate code_files artifact as returned by CodeGeneratorAgent
+        code_files_dict = {
+            'generated_files': [
+                {'path': 'test1.py', 'size': 100},
+                {'path': 'test2.py', 'size': 200}
+            ],
+            'total_count': 2
+        }
+        
+        # Set the artifacts
+        orchestrator.artifacts['code_files'] = code_files_dict
+        orchestrator.artifacts['blueprint'] = {}
+        
+        # Extract code_files as the pipeline would
+        code_files_artifact = orchestrator.artifacts.get('code_files', {})
+        if isinstance(code_files_artifact, dict):
+            code_files_list = code_files_artifact.get('generated_files', [])
+        else:
+            code_files_list = code_files_artifact if isinstance(code_files_artifact, list) else []
+        
+        # Verify extraction
+        assert isinstance(code_files_list, list)
+        assert len(code_files_list) == 2
+        assert code_files_list[0]['path'] == 'test1.py'
+        assert code_files_list[1]['path'] == 'test2.py'
+        
+        # Test with list format (backwards compatibility)
+        orchestrator.artifacts['code_files'] = [
+            {'path': 'test3.py', 'size': 300}
+        ]
+        
+        code_files_artifact = orchestrator.artifacts.get('code_files', {})
+        if isinstance(code_files_artifact, dict):
+            code_files_list = code_files_artifact.get('generated_files', [])
+        else:
+            code_files_list = code_files_artifact if isinstance(code_files_artifact, list) else []
+        
+        assert isinstance(code_files_list, list)
+        assert len(code_files_list) == 1
+        assert code_files_list[0]['path'] == 'test3.py'

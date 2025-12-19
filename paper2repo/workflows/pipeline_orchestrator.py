@@ -135,8 +135,15 @@ class PipelineOrchestrator:
             
             # Phase 3: Verification
             logger.info("Phase 3: Verification & Refinement")
+            code_files_artifact = self.artifacts.get('code_files', {})
+            # Extract the actual list of generated files
+            if isinstance(code_files_artifact, dict):
+                code_files_list = code_files_artifact.get('generated_files', [])
+            else:
+                code_files_list = code_files_artifact if isinstance(code_files_artifact, list) else []
+            
             p3_input = {
-                'code_files': self.artifacts.get('code_files', []),
+                'code_files': code_files_list,
                 'blueprint': self.artifacts.get('blueprint', {})
             }
             p3_result = self.orchestrator.coordinate_workflow('verify', p3_input)
