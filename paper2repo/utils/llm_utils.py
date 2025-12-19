@@ -2,47 +2,68 @@
 from typing import Any, Dict, List, Optional, Callable
 from enum import Enum
 import json
-import os
 import logging
-
-from .llm_providers.base import BaseLLMProvider, LLMMessage
-from .llm_providers.mock_provider import MockLLMProvider
+import re
 
 logger = logging.getLogger(__name__)
 
 
-def create_llm_config_from_dict(config_dict: Dict[str, Any]) -> 'LLMConfig':
-    """Create LLMConfig from dictionary (e.g., loaded from YAML).
+def extract_json_from_response(response: str) -> Dict[str, Any]:
+    """Extract JSON from LLM response, handling markdown code blocks.
     
     Args:
-        config_dict: Configuration dictionary with 'llm' key
+        response: Raw LLM response text
         
     Returns:
-        LLMConfig instance
+        Parsed JSON dictionary
+        
+    Raises:
+        ValueError: If JSON cannot be extracted
     """
-    llm_config = config_dict.get('llm', {})
-    
-    # Parse provider
-    provider_str = llm_config.get('provider', 'mock').lower()
+    # Try direct JSON parsing first
     try:
-        provider = LLMProvider(provider_str)
-    except ValueError:
-        logger.warning(f"Unknown provider '{provider_str}', defaulting to mock")
-        provider = LLMProvider.MOCK
+        return json.loads(response)
+    except json.JSONDecodeError:
+        pass
     
-    # Get model configuration
-    models = llm_config.get('models', {})
+    # Try to extract JSON from markdown code blocks
+    # Look for ```json ... ``` or ``` ... ```
+    json_pattern = r'```(?:json)?\s*\n?(.*?)\n?```'
+    matches = re.findall(json_pattern, response, re.DOTALL)
     
-    return LLMConfig(
-        provider=provider,
-        fast_model=models.get('fast', 'gpt-4o-mini'),
-        balanced_model=models.get('balanced', 'gpt-4o'),
-        powerful_model=models.get('powerful', 'gpt-4-turbo'),
-        max_tokens=llm_config.get('max_tokens', 4096),
-        temperature=llm_config.get('temperature', 0.7),
-        api_timeout=llm_config.get('api_timeout', 60),
-        max_retries=llm_config.get('max_retries', 3),
-    )
+    if matches:
+        for match in matches:
+            try:
+                return json.loads(match.strip())
+            except json.JSONDecodeError:
+                continue
+    
+    # Try to find JSON-like content between first { and last } or [ and ]
+    # This is a simple heuristic that works for most cases
+    stripped = response.strip()
+    
+    # Try to extract object
+    if '{' in stripped and '}' in stripped:
+        start = stripped.find('{')
+        end = stripped.rfind('}')
+        if start < end:
+            try:
+                return json.loads(stripped[start:end+1])
+            except json.JSONDecodeError:
+                pass
+    
+    # Try to extract array
+    if '[' in stripped and ']' in stripped:
+        start = stripped.find('[')
+        end = stripped.rfind(']')
+        if start < end:
+            try:
+                return json.loads(stripped[start:end+1])
+            except json.JSONDecodeError:
+                pass
+    
+    # If all else fails, raise an error
+    raise ValueError("Could not extract valid JSON from response")
 
 
 class LLMProvider(Enum):
@@ -67,12 +88,11 @@ class LLMConfig:
         self,
         provider: LLMProvider = LLMProvider.MOCK,
         fast_model: str = "gpt-4o-mini",
-        balanced_model: str = "gpt-4o",
-        powerful_model: str = "gpt-4-turbo",
+        balanced_model: str = "gpt-4o-mini",
+        powerful_model: str = "gpt-4o",
         max_tokens: int = 4096,
         temperature: float = 0.7,
-        api_timeout: int = 60,
-        max_retries: int = 3,
+        api_key: Optional[str] = None,
     ):
         self.provider = provider
         self.fast_model = fast_model
@@ -80,8 +100,7 @@ class LLMConfig:
         self.powerful_model = powerful_model
         self.max_tokens = max_tokens
         self.temperature = temperature
-        self.api_timeout = api_timeout
-        self.max_retries = max_retries
+        self.api_key = api_key
 
 
 class TokenBudget:
@@ -127,19 +146,6 @@ class TokenBudget:
             "agent_usage": self.agent_usage,
             "utilization": self.used_tokens / self.total_budget if self.total_budget > 0 else 0
         }
-    
-    def warn_if_approaching_limit(self, threshold: float = 0.8) -> None:
-        """Warn if approaching budget limit.
-        
-        Args:
-            threshold: Warning threshold as fraction of total budget (default 0.8 = 80%)
-        """
-        utilization = self.used_tokens / self.total_budget if self.total_budget > 0 else 0
-        if utilization >= threshold:
-            logger.warning(
-                f"Token budget at {utilization:.1%} capacity "
-                f"({self.used_tokens:,}/{self.total_budget:,} tokens used)"
-            )
 
 
 class HybridRouter:
@@ -168,64 +174,26 @@ class HybridRouter:
 class LLMClient:
     """Unified LLM client with provider abstraction."""
     
+    # Default system message for OpenAI
+    DEFAULT_SYSTEM_MESSAGE = (
+        "You are a helpful AI assistant specialized in understanding and "
+        "generating code from research papers."
+    )
+    
     def __init__(self, config: LLMConfig, token_budget: Optional[TokenBudget] = None):
         self.config = config
         self.token_budget = token_budget or TokenBudget()
         self.router = HybridRouter(config)
-        self.provider = self._create_provider()
-    
-    def _create_provider(self) -> BaseLLMProvider:
-        """Create the appropriate LLM provider based on configuration.
+        self._openai_client = None
         
-        Returns:
-            LLM provider instance
-        """
-        provider_type = self.config.provider
-        
-        # Always try to use mock provider if no API keys are set
-        if provider_type == LLMProvider.OPENAI:
-            api_key = os.environ.get("OPENAI_API_KEY")
-            if not api_key:
-                logger.warning(
-                    "OPENAI_API_KEY not set, falling back to mock provider. "
-                    "Set the environment variable to use OpenAI."
-                )
-                return MockLLMProvider()
-            
+        # Initialize OpenAI client if using OpenAI provider
+        if self.config.provider == LLMProvider.OPENAI and self.config.api_key:
             try:
-                from .llm_providers.openai_provider import OpenAIProvider
-                return OpenAIProvider(
-                    api_key=api_key,
-                    max_retries=self.config.max_retries,
-                    timeout=self.config.api_timeout
-                )
-            except ImportError as e:
-                logger.warning(f"Failed to import OpenAI provider: {e}. Falling back to mock.")
-                return MockLLMProvider()
-        
-        elif provider_type == LLMProvider.ANTHROPIC:
-            api_key = os.environ.get("ANTHROPIC_API_KEY")
-            if not api_key:
-                logger.warning(
-                    "ANTHROPIC_API_KEY not set, falling back to mock provider. "
-                    "Set the environment variable to use Anthropic."
-                )
-                return MockLLMProvider()
-            
-            try:
-                from .llm_providers.anthropic_provider import AnthropicProvider
-                return AnthropicProvider(
-                    api_key=api_key,
-                    max_retries=self.config.max_retries,
-                    timeout=self.config.api_timeout
-                )
-            except ImportError as e:
-                logger.warning(f"Failed to import Anthropic provider: {e}. Falling back to mock.")
-                return MockLLMProvider()
-        
-        else:
-            # Default to mock provider
-            return MockLLMProvider()
+                import openai
+                self._openai_client = openai.OpenAI(api_key=self.config.api_key)
+            except ImportError:
+                logger.warning("OpenAI library not installed. Install with: pip install openai")
+                self._openai_client = None
     
     def generate(
         self,
@@ -253,54 +221,93 @@ class LLMClient:
         max_tokens = max_tokens or self.config.max_tokens
         temperature = temperature or self.config.temperature
         
-        # Count actual tokens in prompt
-        prompt_tokens = self.provider.count_tokens(prompt, model)
-        estimated_tokens = prompt_tokens + max_tokens
+        # Estimate token usage (rough approximation)
+        estimated_tokens = len(prompt.split()) * 2 + max_tokens
         
-        # Check budget before making request
         if not self.token_budget.allocate(agent_name, estimated_tokens):
             raise RuntimeError(
-                f"Token budget exceeded. Remaining: {self.token_budget.get_remaining():,} tokens"
+                f"Token budget exceeded. Remaining: {self.token_budget.get_remaining()}"
             )
         
-        # Warn if approaching budget limit
-        self.token_budget.warn_if_approaching_limit()
+        # For mock mode, return a simple response
+        if self.config.provider == LLMProvider.MOCK:
+            return self._mock_generate(prompt, agent_name)
         
-        try:
-            # Make LLM request through provider
-            response = self.provider.generate(
+        # Implement OpenAI provider
+        if self.config.provider == LLMProvider.OPENAI:
+            return self._openai_generate(
                 prompt=prompt,
                 model=model,
                 max_tokens=max_tokens,
                 temperature=temperature,
                 **kwargs
             )
+        
+        # Fallback to mock if provider not implemented
+        logger.warning(f"Provider {self.config.provider} not implemented, using mock")
+        return self._mock_generate(prompt, agent_name)
+    
+    def _openai_generate(
+        self,
+        prompt: str,
+        model: str,
+        max_tokens: int,
+        temperature: float,
+        **kwargs
+    ) -> str:
+        """Generate text using OpenAI API.
+        
+        Args:
+            prompt: Input prompt
+            model: Model name
+            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature
+            **kwargs: Additional OpenAI-specific arguments
             
-            # Update token usage with actual usage
-            actual_tokens = response.usage.get("total_tokens", estimated_tokens)
-            token_diff = actual_tokens - estimated_tokens
-            
-            if token_diff != 0:
-                # Adjust the budget with the difference
-                self.token_budget.used_tokens += token_diff
-                self.token_budget.agent_usage[agent_name] += token_diff
-            
-            logger.info(
-                f"LLM request completed for {agent_name}: "
-                f"{response.usage.get('prompt_tokens', 0)} prompt + "
-                f"{response.usage.get('completion_tokens', 0)} completion = "
-                f"{response.usage.get('total_tokens', 0)} total tokens"
+        Returns:
+            Generated text
+        """
+        if not self._openai_client:
+            raise RuntimeError(
+                "OpenAI client not initialized. Ensure API key is provided and openai library is installed."
+            )
+        
+        try:
+            response = self._openai_client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": self.DEFAULT_SYSTEM_MESSAGE},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=max_tokens,
+                temperature=temperature,
+                **kwargs
             )
             
-            return response.content
+            # Extract the generated text
+            if not response.choices or not response.choices[0].message.content:
+                raise RuntimeError("OpenAI API returned empty response")
+            
+            generated_text = response.choices[0].message.content
+            
+            # Log actual token usage
+            if hasattr(response, 'usage') and response.usage:
+                actual_tokens = response.usage.total_tokens
+                logger.info(f"OpenAI API call completed. Tokens used: {actual_tokens}")
+            
+            return generated_text
             
         except Exception as e:
-            logger.error(f"LLM generation failed for {agent_name}: {e}")
-            # Refund the estimated tokens since the request failed
-            self.token_budget.used_tokens -= estimated_tokens
-            if agent_name in self.token_budget.agent_usage:
-                self.token_budget.agent_usage[agent_name] -= estimated_tokens
-            raise
+            logger.error(f"OpenAI API error: {e}")
+            raise RuntimeError(f"OpenAI API call failed: {e}")
+    
+    def _mock_generate(self, prompt: str, agent_name: str) -> str:
+        """Generate mock response for testing."""
+        return json.dumps({
+            "agent": agent_name,
+            "response": f"Mock response for {agent_name}",
+            "status": "success"
+        }, indent=2)
     
     def get_budget_report(self) -> Dict[str, Any]:
         """Get token budget usage report."""

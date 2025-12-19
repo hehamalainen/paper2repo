@@ -2,7 +2,7 @@
 from typing import Dict, Any
 import logging
 import json
-from paper2repo.utils.llm_utils import LLMClient, ModelTier
+from paper2repo.utils.llm_utils import LLMClient, ModelTier, extract_json_from_response
 from paper2repo.prompts.concept_prompts import get_concept_extraction_prompt
 
 logger = logging.getLogger(__name__)
@@ -55,13 +55,13 @@ class ConceptAnalysisAgent:
             
             try:
                 # Parse concepts from response
-                concepts = json.loads(response)
+                concepts = extract_json_from_response(response)
                 if isinstance(concepts, list):
                     all_concepts.extend(concepts)
                 elif isinstance(concepts, dict) and 'concepts' in concepts:
                     all_concepts.extend(concepts['concepts'])
-            except json.JSONDecodeError:
-                logger.warning(f"Failed to parse concepts from section")
+            except (json.JSONDecodeError, ValueError) as e:
+                logger.warning(f"Failed to parse concepts from section: {e}")
         
         logger.info(f"Extracted {len(all_concepts)} concepts")
         

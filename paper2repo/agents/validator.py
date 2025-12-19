@@ -1,7 +1,7 @@
 """Validator Agent for static analysis and sandbox execution."""
 from typing import Dict, Any, List
 import logging
-from paper2repo.utils.llm_utils import LLMClient, ModelTier
+from paper2repo.utils.llm_utils import LLMClient, ModelTier, extract_json_from_response
 from paper2repo.prompts.validation_prompts import get_static_analysis_prompt, get_compatibility_prompt
 from paper2repo.tools.action.sandbox import Sandbox
 from paper2repo.tools.action.command_exec import CommandExec
@@ -79,7 +79,7 @@ class ValidatorAgent:
             )
             
             import json
-            analysis = json.loads(response)
+            analysis = extract_json_from_response(response)
             return {
                 'file': file_path,
                 'analysis': analysis,

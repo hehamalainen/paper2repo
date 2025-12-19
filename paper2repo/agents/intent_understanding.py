@@ -2,7 +2,7 @@
 from typing import Dict, Any
 import logging
 import json
-from paper2repo.utils.llm_utils import LLMClient, ModelTier
+from paper2repo.utils.llm_utils import LLMClient, ModelTier, extract_json_from_response
 from paper2repo.prompts.intent_prompts import get_intent_prompt
 
 logger = logging.getLogger(__name__)
@@ -46,11 +46,12 @@ class IntentUnderstandingAgent:
         
         try:
             # Parse response as JSON
-            intent = json.loads(response)
+            intent = extract_json_from_response(response)
             logger.info(f"Extracted intent: {intent.get('primary_goal', 'unknown')}")
             return intent
-        except json.JSONDecodeError:
+        except (json.JSONDecodeError, ValueError) as e:
             # Fallback to raw response
+            logger.warning(f"Failed to parse intent as JSON: {e}")
             return {
                 'primary_goal': user_input,
                 'input_type': 'unknown',

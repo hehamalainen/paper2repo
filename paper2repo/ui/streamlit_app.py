@@ -1,11 +1,6 @@
-"""Web user interface for Paper2Repo using Streamlit - MVP with BYOK."""
+"""Web user interface for Paper2Repo using Streamlit."""
 import sys
-import os
-import io
-import tempfile
-import zipfile
 from pathlib import Path
-from typing import Optional, Dict, Any, List
 
 # Check if streamlit is available
 try:
@@ -16,448 +11,277 @@ except ImportError:
 
 if not STREAMLIT_AVAILABLE:
     print("Error: Streamlit is not installed.")
-    print("Install with: pip install -r requirements-streamlit.txt")
+    print("Install with: pip install 'paper2repo[ui]'")
     sys.exit(1)
 
-try:
-    import openai
-    from openai import OpenAI
-    OPENAI_AVAILABLE = True
-except ImportError:
-    OPENAI_AVAILABLE = False
-
-try:
-    import fitz  # PyMuPDF
-    PYMUPDF_AVAILABLE = True
-except ImportError:
-    PYMUPDF_AVAILABLE = False
-
 from paper2repo import __version__
-
-
-def validate_api_key(api_key: str) -> tuple[bool, Optional[str]]:
-    """Validate OpenAI API key with a simple API call.
-    
-    Args:
-        api_key: OpenAI API key to validate
-        
-    Returns:
-        Tuple of (is_valid, error_message)
-    """
-    if not OPENAI_AVAILABLE:
-        return False, "OpenAI library not installed"
-    
-    if not api_key or not api_key.startswith('sk-'):
-        return False, "Invalid API key format"
-    
-    try:
-        client = OpenAI(api_key=api_key)
-        # Use a lighter endpoint for validation - just retrieve a known model
-        client.models.retrieve('gpt-3.5-turbo')
-        return True, None
-    except openai.AuthenticationError:
-        return False, "Invalid API key"
-    except openai.RateLimitError:
-        return False, "Rate limit exceeded"
-    except Exception as e:
-        return False, f"Validation error: {str(e)}"
-
-
-def extract_text_from_pdf(pdf_file) -> tuple[Optional[str], Optional[str]]:
-    """Extract text from uploaded PDF file.
-    
-    Args:
-        pdf_file: Uploaded PDF file from Streamlit
-        
-    Returns:
-        Tuple of (extracted_text, error_message)
-    """
-    if not PYMUPDF_AVAILABLE:
-        return None, "PyMuPDF not installed. Install with: pip install pymupdf"
-    
-    try:
-        # Read PDF bytes
-        pdf_bytes = pdf_file.read()
-        
-        # Open PDF with PyMuPDF
-        pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
-        
-        # Extract text from all pages
-        text_parts = []
-        for page_num in range(len(pdf_document)):
-            page = pdf_document[page_num]
-            text_parts.append(page.get_text())
-        
-        pdf_document.close()
-        
-        full_text = "\n\n".join(text_parts)
-        
-        if not full_text.strip():
-            return None, "No text could be extracted from PDF"
-        
-        return full_text, None
-    
-    except Exception as e:
-        return None, f"PDF parsing error: {str(e)}"
-
-
-def generate_code_mock(api_key: str, paper_text: str, instructions: str, 
-                       model: str, progress_callback: Optional[callable] = None) -> Dict[str, Any]:
-    """Mock code generation for MVP.
-    
-    Args:
-        api_key: OpenAI API key
-        paper_text: Extracted paper text
-        instructions: User instructions
-        model: Model to use
-        progress_callback: Callback for progress updates
-        
-    Returns:
-        Dictionary with generation results
-    """
-    # Simulate phases
-    phases = [
-        "Phase 1: Analyzing paper structure...",
-        "Phase 2: Extracting key concepts...",
-        "Phase 3: Identifying algorithms...",
-        "Phase 4: Planning code structure...",
-        "Phase 5: Generating code files...",
-        "Phase 6: Creating documentation..."
-    ]
-    
-    for i, phase in enumerate(phases):
-        if progress_callback:
-            progress_callback(phase, (i + 1) / len(phases))
-    
-    # Mock generated files
-    generated_files = {
-        "README.md": f"""# Generated Code from Paper
-
-## Overview
-This code was generated from the research paper using Paper2Repo.
-
-## Instructions
-{instructions if instructions else 'No additional instructions provided'}
-
-## Files
-- `main.py`: Main implementation
-- `utils.py`: Utility functions
-- `tests/test_main.py`: Unit tests
-- `requirements.txt`: Dependencies
-
-## Usage
-```bash
-pip install -r requirements.txt
-python main.py
-```
-""",
-        "main.py": """\"\"\"Main implementation generated from paper.\"\"\"
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-def main():
-    \"\"\"Main function.\"\"\"
-    logger.info("Starting generated code execution")
-    # TODO: Implement paper algorithms here
-    
-if __name__ == "__main__":
-    main()
-""",
-        "utils.py": """\"\"\"Utility functions.\"\"\"
-
-def helper_function(x):
-    \"\"\"Helper function.\"\"\"
-    return x * 2
-""",
-        "tests/test_main.py": """\"\"\"Unit tests for main module.\"\"\"
-import pytest
-from main import main
-
-def test_main():
-    \"\"\"Test main function.\"\"\"
-    main()  # Should not raise
-""",
-        "requirements.txt": """pytest>=7.4.0
-numpy>=1.24.0
-"""
-    }
-    
-    return {
-        'success': True,
-        'files': generated_files,
-        'stats': {
-            'total_files': len(generated_files),
-            'lines_of_code': sum(len(content.split('\n')) for content in generated_files.values()),
-            'model_used': model
-        }
-    }
-
-
-def create_zip_file(files: Dict[str, str]) -> bytes:
-    """Create a ZIP file from generated files.
-    
-    Args:
-        files: Dictionary mapping file paths to content
-        
-    Returns:
-        ZIP file bytes
-    """
-    zip_buffer = io.BytesIO()
-    
-    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-        for file_path, content in files.items():
-            zip_file.writestr(file_path, content)
-    
-    zip_buffer.seek(0)
-    return zip_buffer.getvalue()
-
-
-def display_file_tree(files: Dict[str, str]) -> None:
-    """Display file tree structure.
-    
-    Args:
-        files: Dictionary mapping file paths to content
-    """
-    st.markdown("### 📁 Generated Files")
-    
-    # Organize files by directory
-    tree = {}
-    for file_path in sorted(files.keys()):
-        parts = file_path.split('/')
-        current = tree
-        for part in parts[:-1]:
-            if part not in current:
-                current[part] = {}
-            current = current[part]
-        current[parts[-1]] = None
-    
-    def render_tree(node, prefix="", is_last=True):
-        """Recursively render tree structure."""
-        items = sorted(node.items())
-        for i, (name, children) in enumerate(items):
-            is_last_item = (i == len(items) - 1)
-            connector = "└── " if is_last_item else "├── "
-            
-            if children is None:
-                # File
-                st.text(f"{prefix}{connector}📄 {name}")
-            else:
-                # Directory
-                st.text(f"{prefix}{connector}📁 {name}/")
-                extension = "    " if is_last_item else "│   "
-                render_tree(children, prefix + extension, is_last_item)
-    
-    render_tree(tree)
+from paper2repo.workflows.pipeline_orchestrator import PipelineOrchestrator
+from paper2repo.utils.llm_utils import LLMConfig, LLMProvider
 
 
 def main():
     """Main Streamlit application."""
     st.set_page_config(
-        page_title="Paper2Repo - Transform Papers to Code",
-        page_icon="📄➡️💻",
-        layout="wide",
-        initial_sidebar_state="expanded"
+        page_title="Paper2Repo",
+        page_icon="📄",
+        layout="wide"
     )
     
-    # Initialize session state
-    if 'api_key_validated' not in st.session_state:
-        st.session_state.api_key_validated = False
-    if 'generated_files' not in st.session_state:
-        st.session_state.generated_files = None
+    st.title(f"📄 Paper2Repo v{__version__}")
+    st.markdown("Transform research papers into production-ready code repositories")
     
-    # Sidebar - API Key Configuration
-    with st.sidebar:
-        st.header("🔑 Configuration")
+    # Sidebar configuration
+    st.sidebar.header("Configuration")
+    
+    # OpenAI API Key input
+    api_key = st.sidebar.text_input(
+        "OpenAI API Key",
+        type="password",
+        help="Enter your OpenAI API key (BYOK - Bring Your Own Key)"
+    )
+    
+    # LLM Provider selection
+    use_openai = st.sidebar.checkbox(
+        "Use OpenAI API",
+        value=bool(api_key),
+        help="Enable real OpenAI API calls instead of mock responses"
+    )
+    
+    output_dir = st.sidebar.text_input(
+        "Output Directory",
+        value="./output"
+    )
+    
+    token_budget = st.sidebar.number_input(
+        "Token Budget",
+        min_value=100000,
+        max_value=10000000,
+        value=1000000,
+        step=100000
+    )
+    
+    # Main interface
+    tab1, tab2, tab3 = st.tabs(["Generate", "Results", "About"])
+    
+    with tab1:
+        st.header("Generate Code from Paper")
         
-        # API Key Input
-        api_key = st.text_input(
-            "OpenAI API Key",
-            type="password",
-            help="Your API key is never stored and only used for this session",
-            placeholder="sk-..."
+        # Input method selection
+        input_method = st.radio(
+            "Input Method",
+            ["Upload PDF", "Paste Text", "File Path"]
         )
         
-        # Validate API key when provided
-        if api_key:
-            # Store only a hash of the key to check if it changed, not the key itself
-            import hashlib
-            api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
-            
-            if st.session_state.get('last_api_key_hash') != api_key_hash:
-                with st.spinner("Validating API key..."):
-                    is_valid, error_msg = validate_api_key(api_key)
-                    st.session_state.api_key_validated = is_valid
-                    st.session_state.last_api_key_hash = api_key_hash
-                    if not is_valid:
-                        st.session_state.api_key_error = error_msg
-            
-            # Show validation status
-            if st.session_state.api_key_validated:
-                st.success("✅ API Key Valid")
-            else:
-                st.error(f"❌ {st.session_state.get('api_key_error', 'Invalid API Key')}")
-                st.markdown("""
-                [Get your OpenAI API key](https://platform.openai.com/api-keys)
-                """)
-        else:
-            st.info("👆 Enter your OpenAI API key to get started")
-            st.markdown("""
-            [Get your OpenAI API key](https://platform.openai.com/api-keys)
-            """)
+        document_path = None
+        document_text = None
+        user_input = None
         
-        st.divider()
-        
-        # Model Selection (optional)
-        if st.session_state.api_key_validated:
-            model = st.selectbox(
-                "Model",
-                options=["gpt-4o", "gpt-4o-mini"],
-                index=1,  # Default to gpt-4o-mini
-                help="Select the model for code generation"
+        if input_method == "Upload PDF":
+            uploaded_file = st.file_uploader(
+                "Upload Research Paper (PDF)",
+                type=['pdf']
             )
-        else:
-            model = "gpt-4o-mini"
+            if uploaded_file:
+                # Save uploaded file
+                temp_path = Path(f"/tmp/{uploaded_file.name}")
+                temp_path.write_bytes(uploaded_file.read())
+                document_path = str(temp_path)
         
-        st.divider()
+        elif input_method == "Paste Text":
+            document_text = st.text_area(
+                "Paper Content",
+                height=300,
+                placeholder="Paste the research paper content here..."
+            )
         
-        # Security Notice
-        st.caption("🔒 Your API key is never stored and only used for this session")
-    
-    # Main Area
-    st.title("Paper2Repo 📄➡️💻")
-    st.markdown("**Transform research papers into working code**")
-    
-    st.divider()
-    
-    # PDF Upload
-    uploaded_file = st.file_uploader(
-        "📄 Upload Research Paper (PDF)",
-        type=['pdf'],
-        help="Upload a PDF of the research paper you want to convert to code"
-    )
-    
-    # Optional Instructions
-    instructions = st.text_area(
-        "💡 Additional Instructions (Optional)",
-        placeholder="e.g., 'Include unit tests', 'Use NumPy for calculations', 'Add detailed comments'",
-        help="Provide any specific requirements or preferences for the generated code"
-    )
-    
-    # Generate Button
-    can_generate = (
-        st.session_state.api_key_validated 
-        and uploaded_file is not None
-    )
-    
-    generate_button = st.button(
-        "🚀 Generate Code",
-        type="primary",
-        disabled=not can_generate,
-        use_container_width=True
-    )
-    
-    if not can_generate and uploaded_file:
-        st.warning("⚠️ Please enter a valid API key to generate code")
-    
-    # Generation Process
-    if generate_button:
-        # Extract text from PDF
-        with st.spinner("📖 Extracting text from PDF..."):
-            paper_text, error = extract_text_from_pdf(uploaded_file)
+        elif input_method == "File Path":
+            document_path = st.text_input(
+                "Paper File Path",
+                placeholder="/path/to/paper.pdf"
+            )
         
-        if error:
-            st.error(f"❌ {error}")
-            st.info("💡 Make sure the PDF contains selectable text (not just images)")
-        else:
-            # Show progress
-            progress_bar = st.progress(0.0)
-            status_text = st.empty()
-            
-            def update_progress(message: str, progress: float):
-                status_text.text(message)
-                progress_bar.progress(progress)
-            
-            # Generate code
-            try:
-                results = generate_code_mock(
-                    api_key,
-                    paper_text,
-                    instructions,
-                    model,
-                    update_progress
-                )
-                
-                # Store results in session state
-                st.session_state.generated_files = results['files']
-                st.session_state.generation_stats = results['stats']
-                
-                # Clear progress indicators
-                progress_bar.empty()
-                status_text.empty()
-                
-                st.success("✅ Code generated successfully!")
-                st.balloons()
-                
-            except Exception as e:
-                st.error(f"❌ Generation error: {str(e)}")
-                st.info("💡 Try again or check your API key")
-    
-    # Results Display
-    if st.session_state.generated_files:
-        st.divider()
-        st.header("📦 Generated Code")
-        
-        # Stats
-        stats = st.session_state.generation_stats
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Files Generated", stats['total_files'])
-        with col2:
-            st.metric("Lines of Code", stats['lines_of_code'])
-        with col3:
-            st.metric("Model Used", stats['model_used'])
-        
-        # File Tree
-        display_file_tree(st.session_state.generated_files)
-        
-        st.divider()
-        
-        # Code Preview with Tabs
-        st.markdown("### 👀 Code Preview")
-        file_tabs = st.tabs([Path(f).name for f in sorted(st.session_state.generated_files.keys())])
-        
-        for tab, (file_path, content) in zip(file_tabs, sorted(st.session_state.generated_files.items())):
-            with tab:
-                # Determine language for syntax highlighting
-                ext = Path(file_path).suffix
-                language_map = {
-                    '.py': 'python',
-                    '.js': 'javascript',
-                    '.md': 'markdown',
-                    '.txt': 'text',
-                    '.json': 'json',
-                    '.yaml': 'yaml',
-                    '.yml': 'yaml'
-                }
-                language = language_map.get(ext, 'text')
-                
-                st.code(content, language=language, line_numbers=True)
-        
-        st.divider()
-        
-        # Download ZIP
-        st.markdown("### 💾 Download Code")
-        zip_bytes = create_zip_file(st.session_state.generated_files)
-        
-        st.download_button(
-            label="⬇️ Download as ZIP",
-            data=zip_bytes,
-            file_name="paper2repo_generated_code.zip",
-            mime="application/zip",
-            use_container_width=True
+        user_input = st.text_input(
+            "Additional Requirements (optional)",
+            placeholder="e.g., 'Implement in Python with tests'"
         )
+        
+        if st.button("🚀 Generate Code", type="primary"):
+            if not document_path and not document_text:
+                st.error("Please provide a paper (file or text)")
+            elif use_openai and not api_key:
+                st.error("Please provide an OpenAI API key or disable 'Use OpenAI API'")
+            else:
+                # Create progress indicators
+                progress_bar = st.progress(0)
+                status_text = st.empty()
+                
+                try:
+                    # Create LLM Config
+                    if use_openai and api_key:
+                        llm_config = LLMConfig(
+                            provider=LLMProvider.OPENAI,
+                            api_key=api_key,
+                            fast_model="gpt-4o-mini",
+                            balanced_model="gpt-4o-mini",
+                            powerful_model="gpt-4o"
+                        )
+                        status_text.text("🔧 Using OpenAI API...")
+                    else:
+                        llm_config = LLMConfig(provider=LLMProvider.MOCK)
+                        status_text.text("🔧 Using Mock mode...")
+                    
+                    progress_bar.progress(10)
+                    
+                    # Initialize pipeline
+                    status_text.text("⚙️ Initializing pipeline...")
+                    pipeline = PipelineOrchestrator(
+                        output_dir=Path(output_dir),
+                        llm_config=llm_config,
+                        total_token_budget=token_budget
+                    )
+                    progress_bar.progress(20)
+                    
+                    # Prepare input
+                    input_data = {
+                        'user_input': user_input or "Generate code from paper"
+                    }
+                    
+                    if document_path:
+                        input_data['document_path'] = document_path
+                    if document_text:
+                        input_data['document_text'] = document_text
+                    
+                    # Phase 1: Blueprint
+                    status_text.text("📋 Phase 1: Blueprint Generation (Intent → Document → Concepts → Algorithms → Planning)...")
+                    progress_bar.progress(30)
+                    
+                    # Phase 2: Code Generation
+                    phase_container = st.container()
+                    with phase_container:
+                        st.info("🔄 Running pipeline phases...")
+                    
+                    # Run pipeline
+                    results = pipeline.run(input_data)
+                    
+                    progress_bar.progress(100)
+                    status_text.text("✅ Pipeline complete!")
+                    
+                    # Store results in session state
+                    st.session_state['results'] = results
+                    st.session_state['output_dir'] = str(pipeline.get_output_directory())
+                    
+                    if results['success']:
+                        st.success("✅ Code generated successfully!")
+                        st.info(f"📁 Output: {pipeline.get_output_directory()}")
+                        
+                        # Show token usage
+                        if 'token_budget' in results:
+                            budget = results['token_budget']
+                            st.metric(
+                                "Token Usage",
+                                f"{budget['used_tokens']:,}",
+                                f"{budget['utilization']:.1%} of budget"
+                            )
+                    else:
+                        st.error("❌ Generation failed")
+                        for error in results.get('errors', []):
+                            st.error(f"Error: {error}")
+                
+                except Exception as e:
+                    progress_bar.progress(0)
+                    status_text.text("")
+                    st.error(f"Pipeline error: {str(e)}")
+                    # Only show detailed error in development
+                    if st.sidebar.checkbox("Show error details", value=False):
+                        import traceback
+                        with st.expander("Error Details"):
+                            st.code(traceback.format_exc())
+    
+    with tab2:
+        st.header("Generation Results")
+        
+        if 'results' in st.session_state:
+            results = st.session_state['results']
+            
+            # Show success status
+            if results['success']:
+                st.success("✅ Generation successful")
+            else:
+                st.error("❌ Generation failed")
+            
+            # Show token usage
+            if 'token_budget' in results:
+                budget = results['token_budget']
+                st.metric(
+                    "Token Usage",
+                    f"{budget['used_tokens']:,}",
+                    f"{budget['utilization']:.1%} of budget"
+                )
+            
+            # Download button for generated code
+            if 'output_dir' in st.session_state:
+                output_path = Path(st.session_state['output_dir'])
+                if output_path.exists():
+                    st.subheader("📦 Download Generated Code")
+                    st.info(f"Output directory: {output_path}")
+                    
+                    # Create ZIP file
+                    import zipfile
+                    import io
+                    
+                    zip_buffer = io.BytesIO()
+                    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                        for file_path in output_path.rglob('*'):
+                            if file_path.is_file():
+                                arcname = file_path.relative_to(output_path)
+                                zip_file.write(file_path, arcname)
+                    
+                    zip_buffer.seek(0)
+                    st.download_button(
+                        label="📥 Download ZIP",
+                        data=zip_buffer,
+                        file_name="generated_code.zip",
+                        mime="application/zip"
+                    )
+            
+            # Show phases
+            st.subheader("Pipeline Phases")
+            for phase_name, phase_data in results.get('phases', {}).items():
+                with st.expander(f"📋 {phase_name}"):
+                    st.json(phase_data.get('artifacts', {}))
+            
+            # Show generated files
+            if 'artifacts' in results and 'code_files' in results['artifacts']:
+                st.subheader("Generated Files")
+                files = results['artifacts']['code_files'].get('generated_files', [])
+                for file_info in files:
+                    st.text(f"✓ {file_info['path']} ({file_info['size']} bytes)")
+        else:
+            st.info("No results yet. Generate code in the 'Generate' tab.")
+    
+    with tab3:
+        st.header("About Paper2Repo")
+        st.markdown(f"""
+        **Version:** {__version__}
+        
+        **Paper2Repo** is an AI-powered multi-agent platform that transforms 
+        research papers into production-ready code repositories.
+        
+        ### Features
+        - 📄 PDF and text input support
+        - 🤖 Multi-agent architecture
+        - 🔍 Concept and algorithm extraction
+        - 💻 Code generation with verification
+        - 📊 Token budget management
+        
+        ### Pipeline Phases
+        1. **P1 Blueprint**: Intent understanding, document parsing, concept/algorithm analysis
+        2. **P2 CodeGen**: Reference mining, code generation
+        3. **P3 Verify**: Validation and refinement
+        
+        ### Documentation
+        Visit [GitHub](https://github.com/hehamalainen/paper2repo) for full documentation.
+        """)
 
 
 if __name__ == '__main__':
