@@ -2,16 +2,12 @@
 
 # LLM Provider Settings
 llm:
-  provider: ${LLM_PROVIDER:-mock}  # openai, anthropic, or mock
-  default_model: gpt-4o
-  models:
-    fast: gpt-4o-mini
-    balanced: gpt-4o
-    powerful: gpt-4-turbo
+  provider: ${LLM_PROVIDER:-mock}  # openai, anthropic, local, mock
+  fast_model: gpt-3.5-turbo
+  balanced_model: gpt-4
+  powerful_model: gpt-4-turbo
   max_tokens: 4096
   temperature: 0.7
-  api_timeout: 60
-  max_retries: 3
 
 # Token Budget
 budget:

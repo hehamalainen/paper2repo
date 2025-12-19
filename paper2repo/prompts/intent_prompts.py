@@ -15,7 +15,8 @@ Analyze and extract:
 4. **Constraints**: Any specific requirements or limitations
 5. **Success Criteria**: How to measure success
 
-Provide your analysis in structured JSON format:
+Return ONLY a JSON object with your analysis. Do not include any other text or explanation.
+Example format:
 {{
   "primary_goal": "...",
   "input_type": "...",

@@ -3,7 +3,7 @@ from typing import Dict, Any
 import logging
 import json
 import yaml
-from paper2repo.utils.llm_utils import LLMClient, ModelTier
+from paper2repo.utils.llm_utils import LLMClient, ModelTier, extract_json_from_response
 from paper2repo.prompts.planning_prompts import get_blueprint_prompt
 
 logger = logging.getLogger(__name__)
@@ -58,9 +58,9 @@ class CodePlanningAgent:
         except yaml.YAMLError:
             try:
                 # Fallback to JSON
-                blueprint = json.loads(response)
+                blueprint = extract_json_from_response(response)
                 return blueprint
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, ValueError):
                 # Return minimal blueprint
                 logger.warning("Failed to parse blueprint, returning minimal structure")
                 return self._create_minimal_blueprint()

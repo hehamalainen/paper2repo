@@ -98,12 +98,8 @@ def test_intent_understanding_agent():
         'user_input': 'Generate code from a paper about neural networks'
     })
     
-    # Mock response returns a dict that may not have the expected keys
-    # Check for any valid response structure
-    assert isinstance(result, dict)
-    assert len(result) > 0
-    # Could have 'primary_goal', 'raw_response', 'model', or 'response' depending on mock format
-    assert any(key in result for key in ['primary_goal', 'raw_response', 'agent', 'model', 'response'])
+    # Mock response returns a dict with agent info, which triggers fallback
+    assert 'primary_goal' in result or 'raw_response' in result or 'agent' in result
 
 
 def test_code_planning_minimal(sample_blueprint):
