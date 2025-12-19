@@ -2,7 +2,7 @@
 from typing import Dict, Any
 import logging
 import json
-from paper2repo.utils.llm_utils import LLMClient, ModelTier
+from paper2repo.utils.llm_utils import LLMClient, ModelTier, extract_json_from_response
 from paper2repo.prompts.algorithm_prompts import get_algorithm_extraction_prompt
 
 logger = logging.getLogger(__name__)
@@ -57,13 +57,13 @@ class AlgorithmAnalysisAgent:
             
             try:
                 # Parse algorithms from response
-                algorithms = json.loads(response)
+                algorithms = extract_json_from_response(response)
                 if isinstance(algorithms, list):
                     all_algorithms.extend(algorithms)
                 elif isinstance(algorithms, dict) and 'algorithms' in algorithms:
                     all_algorithms.extend(algorithms['algorithms'])
-            except json.JSONDecodeError:
-                logger.warning(f"Failed to parse algorithms from section")
+            except (json.JSONDecodeError, ValueError) as e:
+                logger.warning(f"Failed to parse algorithms from section: {e}")
         
         logger.info(f"Extracted {len(all_algorithms)} algorithms")
         
