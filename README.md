@@ -1,3 +1,14 @@
+---
+title: Paper2Repo
+emoji: 📄
+colorFrom: blue
+colorTo: purple
+sdk: streamlit
+sdk_version: "1.40.0"
+app_file: app.py
+pinned: false
+---
+
 # Paper2Repo 📄➡️💻
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
