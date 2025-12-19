@@ -40,12 +40,27 @@ def main():
         help="Enter your OpenAI API key (BYOK - Bring Your Own Key)"
     )
     
-    # LLM Provider selection
-    use_openai = st.sidebar.checkbox(
-        "Use OpenAI API",
-        value=bool(api_key),
-        help="Enable real OpenAI API calls instead of mock responses"
-    )
+    # Validate API key format
+    api_key_valid = api_key and api_key.startswith('sk-')
+    
+    # Show status indicator
+    if api_key_valid:
+        st.sidebar.success("✅ API Key Valid")
+    elif api_key:
+        st.sidebar.error("❌ Invalid API Key Format (must start with 'sk-')")
+    
+    # Model selection (only shown when using OpenAI)
+    selected_model = None
+    if api_key_valid:
+        selected_model = st.sidebar.selectbox(
+            "Model",
+            options=["gpt-4o-mini", "gpt-4o", "gpt-4-turbo"],
+            index=0,
+            help="Select the OpenAI model to use"
+        )
+        st.sidebar.info(f"🟢 Using OpenAI API ({selected_model})")
+    else:
+        st.sidebar.warning("🟡 Using Mock Mode (no API key)")
     
     output_dir = st.sidebar.text_input(
         "Output Directory",
@@ -108,8 +123,6 @@ def main():
         if st.button("🚀 Generate Code", type="primary"):
             if not document_path and not document_text:
                 st.error("Please provide a paper (file or text)")
-            elif use_openai and not api_key:
-                st.error("Please provide an OpenAI API key or disable 'Use OpenAI API'")
             else:
                 # Create progress indicators
                 progress_bar = st.progress(0)
@@ -117,15 +130,16 @@ def main():
                 
                 try:
                     # Create LLM Config
-                    if use_openai and api_key:
+                    if api_key_valid:
+                        # Use selected model for all tiers (user's choice)
                         llm_config = LLMConfig(
                             provider=LLMProvider.OPENAI,
                             api_key=api_key,
-                            fast_model="gpt-4o-mini",
-                            balanced_model="gpt-4o-mini",
-                            powerful_model="gpt-4o"
+                            fast_model=selected_model,
+                            balanced_model=selected_model,
+                            powerful_model=selected_model
                         )
-                        status_text.text("🔧 Using OpenAI API...")
+                        status_text.text(f"🔧 Using OpenAI API ({selected_model})...")
                     else:
                         llm_config = LLMConfig(provider=LLMProvider.MOCK)
                         status_text.text("🔧 Using Mock mode...")
