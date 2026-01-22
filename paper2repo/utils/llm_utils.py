@@ -194,67 +194,75 @@ class LLMClient:
         Returns:
             Initialized provider instance
         """
-        # Mock provider - no API key needed
-        if self.config.provider == LLMProvider.MOCK:
+        try:
+            # Mock provider - no API key needed
+            if self.config.provider == LLMProvider.MOCK:
+                return MockLLMProvider(
+                    max_retries=self.config.max_retries,
+                    timeout=self.config.api_timeout
+                )
+            
+            # OpenAI provider
+            if self.config.provider == LLMProvider.OPENAI:
+                api_key = self.config.api_key or os.environ.get("OPENAI_API_KEY")
+                if not api_key:
+                    logger.warning("OpenAI provider selected but no API key found. Falling back to mock provider.")
+                    return MockLLMProvider(
+                        max_retries=self.config.max_retries,
+                        timeout=self.config.api_timeout
+                    )
+                
+                try:
+                    from .llm_providers.openai_provider import OpenAIProvider
+                    return OpenAIProvider(
+                        api_key=api_key,
+                        max_retries=self.config.max_retries,
+                        timeout=self.config.api_timeout
+                    )
+                except ImportError:
+                    logger.warning("OpenAI SDK not available. Falling back to mock provider.")
+                    return MockLLMProvider(
+                        max_retries=self.config.max_retries,
+                        timeout=self.config.api_timeout
+                    )
+            
+            # Anthropic provider
+            if self.config.provider == LLMProvider.ANTHROPIC:
+                api_key = self.config.api_key or os.environ.get("ANTHROPIC_API_KEY")
+                if not api_key:
+                    logger.warning("Anthropic provider selected but no API key found. Falling back to mock provider.")
+                    return MockLLMProvider(
+                        max_retries=self.config.max_retries,
+                        timeout=self.config.api_timeout
+                    )
+                
+                try:
+                    from .llm_providers.anthropic_provider import AnthropicProvider
+                    return AnthropicProvider(
+                        api_key=api_key,
+                        max_retries=self.config.max_retries,
+                        timeout=self.config.api_timeout
+                    )
+                except ImportError:
+                    logger.warning("Anthropic SDK not available. Falling back to mock provider.")
+                    return MockLLMProvider(
+                        max_retries=self.config.max_retries,
+                        timeout=self.config.api_timeout
+                    )
+            
+            # Default to mock provider for unknown providers
+            logger.warning(f"Unknown provider {self.config.provider}. Falling back to mock provider.")
             return MockLLMProvider(
                 max_retries=self.config.max_retries,
                 timeout=self.config.api_timeout
             )
-        
-        # OpenAI provider
-        if self.config.provider == LLMProvider.OPENAI:
-            api_key = self.config.api_key or os.environ.get("OPENAI_API_KEY")
-            if not api_key:
-                logger.warning("OpenAI provider selected but no API key found. Falling back to mock provider.")
-                return MockLLMProvider(
-                    max_retries=self.config.max_retries,
-                    timeout=self.config.api_timeout
-                )
-            
-            try:
-                from .llm_providers.openai_provider import OpenAIProvider
-                return OpenAIProvider(
-                    api_key=api_key,
-                    max_retries=self.config.max_retries,
-                    timeout=self.config.api_timeout
-                )
-            except ImportError:
-                logger.warning("OpenAI SDK not available. Falling back to mock provider.")
-                return MockLLMProvider(
-                    max_retries=self.config.max_retries,
-                    timeout=self.config.api_timeout
-                )
-        
-        # Anthropic provider
-        if self.config.provider == LLMProvider.ANTHROPIC:
-            api_key = self.config.api_key or os.environ.get("ANTHROPIC_API_KEY")
-            if not api_key:
-                logger.warning("Anthropic provider selected but no API key found. Falling back to mock provider.")
-                return MockLLMProvider(
-                    max_retries=self.config.max_retries,
-                    timeout=self.config.api_timeout
-                )
-            
-            try:
-                from .llm_providers.anthropic_provider import AnthropicProvider
-                return AnthropicProvider(
-                    api_key=api_key,
-                    max_retries=self.config.max_retries,
-                    timeout=self.config.api_timeout
-                )
-            except ImportError:
-                logger.warning("Anthropic SDK not available. Falling back to mock provider.")
-                return MockLLMProvider(
-                    max_retries=self.config.max_retries,
-                    timeout=self.config.api_timeout
-                )
-        
-        # Default to mock provider for unknown providers
-        logger.warning(f"Unknown provider {self.config.provider}. Falling back to mock provider.")
-        return MockLLMProvider(
-            max_retries=self.config.max_retries,
-            timeout=self.config.api_timeout
-        )
+        except Exception as e:
+            # Catch any unexpected errors during provider initialization
+            logger.error(f"Error initializing provider: {e}. Falling back to mock provider.")
+            return MockLLMProvider(
+                max_retries=self.config.max_retries,
+                timeout=self.config.api_timeout
+            )
     
     def generate(
         self,
@@ -301,8 +309,15 @@ class LLMClient:
         
         # Log actual token usage if available
         if response.usage:
-            actual_tokens = response.usage.get('total_tokens', 0)
-            logger.info(f"LLM API call completed. Tokens used: {actual_tokens}")
+            try:
+                # Handle both dict and object-like usage data
+                if isinstance(response.usage, dict):
+                    actual_tokens = response.usage.get('total_tokens', 0)
+                else:
+                    actual_tokens = getattr(response.usage, 'total_tokens', 0)
+                logger.info(f"LLM API call completed. Tokens used: {actual_tokens}")
+            except (AttributeError, TypeError):
+                logger.debug("Could not extract token usage from response")
         
         content = response.content
         
@@ -315,6 +330,7 @@ class LLMClient:
                     content = json.dumps(parsed, indent=2)
             except (json.JSONDecodeError, ValueError):
                 # If not JSON, return as-is
+                pass
                 pass
         
         return content
