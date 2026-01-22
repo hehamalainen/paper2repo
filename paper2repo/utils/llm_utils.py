@@ -4,6 +4,10 @@ from enum import Enum
 import json
 import logging
 import re
+import os
+
+from .llm_providers.base import BaseLLMProvider, LLMMessage
+from .llm_providers.mock_provider import MockLLMProvider
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +97,8 @@ class LLMConfig:
         max_tokens: int = 4096,
         temperature: float = 0.7,
         api_key: Optional[str] = None,
+        api_timeout: int = 60,
+        max_retries: int = 3,
     ):
         self.provider = provider
         self.fast_model = fast_model
@@ -101,6 +107,8 @@ class LLMConfig:
         self.max_tokens = max_tokens
         self.temperature = temperature
         self.api_key = api_key
+        self.api_timeout = api_timeout
+        self.max_retries = max_retries
 
 
 class TokenBudget:
@@ -174,26 +182,87 @@ class HybridRouter:
 class LLMClient:
     """Unified LLM client with provider abstraction."""
     
-    # Default system message for OpenAI
-    DEFAULT_SYSTEM_MESSAGE = (
-        "You are a helpful AI assistant specialized in understanding and "
-        "generating code from research papers."
-    )
-    
     def __init__(self, config: LLMConfig, token_budget: Optional[TokenBudget] = None):
         self.config = config
         self.token_budget = token_budget or TokenBudget()
         self.router = HybridRouter(config)
-        self._openai_client = None
+        self.provider = self._initialize_provider()
+    
+    def _initialize_provider(self) -> BaseLLMProvider:
+        """Initialize the appropriate LLM provider based on configuration.
         
-        # Initialize OpenAI client if using OpenAI provider
-        if self.config.provider == LLMProvider.OPENAI and self.config.api_key:
-            try:
-                import openai
-                self._openai_client = openai.OpenAI(api_key=self.config.api_key)
-            except ImportError:
-                logger.warning("OpenAI library not installed. Install with: pip install openai")
-                self._openai_client = None
+        Returns:
+            Initialized provider instance
+        """
+        try:
+            # Mock provider - no API key needed
+            if self.config.provider == LLMProvider.MOCK:
+                return MockLLMProvider(
+                    max_retries=self.config.max_retries,
+                    timeout=self.config.api_timeout
+                )
+            
+            # OpenAI provider
+            if self.config.provider == LLMProvider.OPENAI:
+                api_key = self.config.api_key or os.environ.get("OPENAI_API_KEY")
+                if not api_key:
+                    logger.warning("OpenAI provider selected but no API key found. Falling back to mock provider.")
+                    return MockLLMProvider(
+                        max_retries=self.config.max_retries,
+                        timeout=self.config.api_timeout
+                    )
+                
+                try:
+                    from .llm_providers.openai_provider import OpenAIProvider
+                    return OpenAIProvider(
+                        api_key=api_key,
+                        max_retries=self.config.max_retries,
+                        timeout=self.config.api_timeout
+                    )
+                except ImportError:
+                    logger.warning("OpenAI SDK not available. Falling back to mock provider.")
+                    return MockLLMProvider(
+                        max_retries=self.config.max_retries,
+                        timeout=self.config.api_timeout
+                    )
+            
+            # Anthropic provider
+            if self.config.provider == LLMProvider.ANTHROPIC:
+                api_key = self.config.api_key or os.environ.get("ANTHROPIC_API_KEY")
+                if not api_key:
+                    logger.warning("Anthropic provider selected but no API key found. Falling back to mock provider.")
+                    return MockLLMProvider(
+                        max_retries=self.config.max_retries,
+                        timeout=self.config.api_timeout
+                    )
+                
+                try:
+                    from .llm_providers.anthropic_provider import AnthropicProvider
+                    return AnthropicProvider(
+                        api_key=api_key,
+                        max_retries=self.config.max_retries,
+                        timeout=self.config.api_timeout
+                    )
+                except ImportError:
+                    logger.warning("Anthropic SDK not available. Falling back to mock provider.")
+                    return MockLLMProvider(
+                        max_retries=self.config.max_retries,
+                        timeout=self.config.api_timeout
+                    )
+            
+            # Default to mock provider for unknown providers
+            logger.warning(f"Unknown provider {self.config.provider}. Falling back to mock provider.")
+            return MockLLMProvider(
+                max_retries=self.config.max_retries,
+                timeout=self.config.api_timeout
+            )
+        except Exception as e:
+            # Catch any unexpected errors during provider initialization
+            logger.error(f"Error initializing provider: {e}. Falling back to mock provider.")
+            return MockLLMProvider(
+                max_retries=self.config.max_retries,
+                timeout=self.config.api_timeout
+            )
     
     def generate(
         self,
@@ -229,86 +298,95 @@ class LLMClient:
                 f"Token budget exceeded. Remaining: {self.token_budget.get_remaining()}"
             )
         
-        # For mock mode, return a simple response
-        if self.config.provider == LLMProvider.MOCK:
-            return self._mock_generate(prompt, agent_name)
+        # Use the provider to generate response
+        response = self.provider.generate(
+            prompt=prompt,
+            model=model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            **kwargs
+        )
         
-        # Implement OpenAI provider
-        if self.config.provider == LLMProvider.OPENAI:
-            return self._openai_generate(
-                prompt=prompt,
-                model=model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                **kwargs
-            )
+        # Log actual token usage if available
+        if response.usage:
+            try:
+                # Handle both dict and object-like usage data
+                if isinstance(response.usage, dict):
+                    actual_tokens = response.usage.get('total_tokens', 0)
+                else:
+                    actual_tokens = getattr(response.usage, 'total_tokens', 0)
+                logger.info(f"LLM API call completed. Tokens used: {actual_tokens}")
+            except (AttributeError, TypeError):
+                logger.debug("Could not extract token usage from response")
         
-        # Fallback to mock if provider not implemented
-        logger.warning(f"Provider {self.config.provider} not implemented, using mock")
-        return self._mock_generate(prompt, agent_name)
-    
-    def _openai_generate(
-        self,
-        prompt: str,
-        model: str,
-        max_tokens: int,
-        temperature: float,
-        **kwargs
-    ) -> str:
-        """Generate text using OpenAI API.
+        content = response.content
         
-        Args:
-            prompt: Input prompt
-            model: Model name
-            max_tokens: Maximum tokens to generate
-            temperature: Sampling temperature
-            **kwargs: Additional OpenAI-specific arguments
-            
-        Returns:
-            Generated text
-        """
-        if not self._openai_client:
-            raise RuntimeError(
-                "OpenAI client not initialized. Ensure API key is provided and openai library is installed."
-            )
+        # For backward compatibility with mock provider, add agent key to response
+        if isinstance(self.provider, MockLLMProvider):
+            try:
+                parsed = json.loads(content)
+                if 'agent' not in parsed:
+                    parsed['agent'] = agent_name
+                    content = json.dumps(parsed, indent=2)
+            except (json.JSONDecodeError, ValueError):
+                # If not JSON, return as-is
+                pass
+                pass
         
-        try:
-            response = self._openai_client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": self.DEFAULT_SYSTEM_MESSAGE},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=max_tokens,
-                temperature=temperature,
-                **kwargs
-            )
-            
-            # Extract the generated text
-            if not response.choices or not response.choices[0].message.content:
-                raise RuntimeError("OpenAI API returned empty response")
-            
-            generated_text = response.choices[0].message.content
-            
-            # Log actual token usage
-            if hasattr(response, 'usage') and response.usage:
-                actual_tokens = response.usage.total_tokens
-                logger.info(f"OpenAI API call completed. Tokens used: {actual_tokens}")
-            
-            return generated_text
-            
-        except Exception as e:
-            logger.error(f"OpenAI API error: {e}")
-            raise RuntimeError(f"OpenAI API call failed: {e}")
-    
-    def _mock_generate(self, prompt: str, agent_name: str) -> str:
-        """Generate mock response for testing."""
-        return json.dumps({
-            "agent": agent_name,
-            "response": f"Mock response for {agent_name}",
-            "status": "success"
-        }, indent=2)
+        return content
     
     def get_budget_report(self) -> Dict[str, Any]:
         """Get token budget usage report."""
         return self.token_budget.get_usage_report()
+
+
+def create_llm_config_from_dict(config_dict: Dict[str, Any]) -> LLMConfig:
+    """Create LLMConfig from configuration dictionary.
+    
+    Args:
+        config_dict: Configuration dictionary with 'llm' section
+        
+    Returns:
+        LLMConfig instance
+    """
+    llm_config = config_dict.get('llm', {})
+    
+    # Parse provider
+    provider_str = llm_config.get('provider', 'mock')
+    try:
+        provider = LLMProvider(provider_str.lower())
+    except ValueError:
+        logger.warning(f"Invalid provider '{provider_str}', defaulting to MOCK")
+        provider = LLMProvider.MOCK
+    
+    # Parse models
+    models = llm_config.get('models', {})
+    fast_model = models.get('fast', 'gpt-4o-mini')
+    balanced_model = models.get('balanced', 'gpt-4o')
+    powerful_model = models.get('powerful', 'gpt-4-turbo')
+    
+    # Parse other settings
+    max_tokens = llm_config.get('max_tokens', 4096)
+    temperature = llm_config.get('temperature', 0.7)
+    api_timeout = llm_config.get('api_timeout', 60)
+    max_retries = llm_config.get('max_retries', 3)
+    
+    # API key from environment or config
+    api_key = llm_config.get('api_key')
+    if not api_key:
+        if provider == LLMProvider.OPENAI:
+            api_key = os.environ.get('OPENAI_API_KEY')
+        elif provider == LLMProvider.ANTHROPIC:
+            api_key = os.environ.get('ANTHROPIC_API_KEY')
+    
+    return LLMConfig(
+        provider=provider,
+        fast_model=fast_model,
+        balanced_model=balanced_model,
+        powerful_model=powerful_model,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        api_key=api_key,
+        api_timeout=api_timeout,
+        max_retries=max_retries
+    )
