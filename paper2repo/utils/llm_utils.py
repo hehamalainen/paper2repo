@@ -304,7 +304,20 @@ class LLMClient:
             actual_tokens = response.usage.get('total_tokens', 0)
             logger.info(f"LLM API call completed. Tokens used: {actual_tokens}")
         
-        return response.content
+        content = response.content
+        
+        # For backward compatibility with mock provider, add agent key to response
+        if isinstance(self.provider, MockLLMProvider):
+            try:
+                parsed = json.loads(content)
+                if 'agent' not in parsed:
+                    parsed['agent'] = agent_name
+                    content = json.dumps(parsed, indent=2)
+            except (json.JSONDecodeError, ValueError):
+                # If not JSON, return as-is
+                pass
+        
+        return content
     
     def get_budget_report(self) -> Dict[str, Any]:
         """Get token budget usage report."""
